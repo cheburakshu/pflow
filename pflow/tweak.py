@@ -5,7 +5,12 @@ import pathlib
 import ast
 import sys
 import time
-from pkg_resources import resource_filename
+
+# 
+try:
+    from pkg_resources import resource_filename
+except:
+    pass
 
 
 class Tweak(object):
@@ -119,10 +124,16 @@ class Tweak(object):
 
     def tweak(self):
         profile_line = 'probe.profile()\n'
+        import_line = 'from pflow import probe\n'
+        cnt_success = 0
         for root,file in self.tweak_files:
-            self.print_status('Tweaking file - {}'.format(os.path.normpath(root + '/' + file)))
+            cnt_success += 1
+            self.print_status('Tweaking file {}/{} - {}'.format(cnt_success, len(self.tweak_files), os.path.normpath(root + '/' + file)))
             if not os.path.exists(os.path.join(self.output_dir, root)):
-                pathlib.Path(os.path.join(self.output_dir, root)).mkdir(parents=True, exist_ok=True)
+                try:
+                    pathlib.Path(os.path.join(self.output_dir, root)).mkdir(parents=True, exist_ok=True)
+                except:
+                    os.makedirs(os.path.join(self.output_dir,root), exist_ok=True)
 
             with open(os.path.join(self.output_dir, root, file), 'w') as b:
                 with open(os.path.join(root, file), 'r') as f:
@@ -130,9 +141,13 @@ class Tweak(object):
                     found_colon = False
                     window = False
                     def_start = 0
-                    b.write('from pflow import probe\n')
+                    import_written = False
                     for line in f:
-                        pattern_def = re.compile(r'(\s*)(def .*)|(\s*)(async\s+def .*)')
+                        if not import_written:
+                            if import_line != line:
+                                b.write(import_line)
+                            import_written = True
+                        pattern_def = re.compile(r'(^\s*)(def .*)|(^\s*)(async\s+def .*)')
                         pattern_comment = re.compile(r'(\s*#)')
                         pattern_colon = re.compile(r'\)\s*:')
                         pattern_any = re.compile(r'(\s*)(.*\n)') # All lines expected to end with a new line. If not indent_start will be set to zero
@@ -147,7 +162,8 @@ class Tweak(object):
 
                         if window is True and indent_start > 0:
                             new_line = ' ' * indent_start + profile_line
-                            b.write(new_line)
+                            if new_line != line:
+                                b.write(new_line)
                             window = False
 
                         if has_def:
@@ -166,12 +182,18 @@ class Tweak(object):
                         b.write(line)
 
     def backup(self):
+        cnt=0
         for root,file in self.tweak_files:
-            self.print_status('Creating backup - {}'.format(os.path.normpath(root + '/' + file)))
+            cnt += 1
+            self.print_status('Creating backup {}/{} - {}'.format(cnt, len(self.tweak_files), os.path.normpath(root + '/' + file)))
             try:
                 if not os.path.exists(os.path.join(self.backup_dir,root)):
-                    #os.mkdirs(os.path.join(self.backup_dir,root), exist_ok=True)
-                    pathlib.Path(os.path.join(self.backup_dir,root)).mkdir(parents=True, exist_ok=True)
+
+                    try:
+                        pathlib.Path(os.path.join(self.backup_dir,root)).mkdir(parents=True, exist_ok=True)
+                    except:
+                        os.makedirs(os.path.join(self.backup_dir,root), exist_ok=True)
+
                 shutil.copy(os.path.join(root,file), os.path.join(self.backup_dir,root))
             except shutil.SameFileError:
                 pass
