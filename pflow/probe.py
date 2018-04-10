@@ -16,10 +16,14 @@ def profile():
         frame = sys._getframe().f_back
         now = datetime.datetime.utcnow().isoformat()
 
-        data['timestamp'] = now
+        data['call_time'] = now
         data['caller'] = frame.f_back.f_code.co_name
-        data['callee'] = frame.f_code.co_name
-        data['param'] = frame.f_locals
+        data['receiver'] = frame.f_code.co_name
+
+        try:
+            data['call_param'] = json.dumps(frame.f_locals, cls=CustomEncoder, sort_keys=True)
+        except:
+             data['call_param'] = str(sys.exc_info())
 
         bdata = json.dumps(data, cls=CustomEncoder, sort_keys=True).encode('utf-8')
         send(bdata)
@@ -32,5 +36,5 @@ def create_producer():
 
 def send(data):
     producer = create_producer() #KafkaProducer()
-    producer.send('profile', data)
+    producer.send('logstash', data)
     producer.flush()
