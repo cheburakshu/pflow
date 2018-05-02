@@ -5,6 +5,7 @@ import pathlib
 import ast
 import sys
 import time
+import importlib
 
 # 
 try:
@@ -14,17 +15,15 @@ except:
 
 
 class Tweak(object):
-    def __init__(self, resource, *args, resource_type='package', package=None, scan_subdir=False, scan_file_name=None, **kwargs):
-        self.resource = resource
-        if not package:
-            self.resource_manager = self.resource
-        self.scan_file_name = scan_file_name
-        self.scan_subdir = scan_subdir
-        self.resource_type = resource_type
+    def __init__(self, package_or_directory_name=None, filter_file_name=None):
+        self.package_or_directory_name = package_or_directory_name
+        self.file_name = filter_file_name
+
+        self.decode_input()
+
         self.report_dir_name = 'report'
         self.backup_dir_name = 'backup'
         self.output_dir_name = 'output'
-        self.resource_dir_name = None
         self.log_dir_name = 'log'
         self.report_dir = None
         self.backup_dir = None
@@ -34,6 +33,31 @@ class Tweak(object):
         self.tweak_files = []
         self.cwd = None
         self.ok = False
+        self.precheck_err = 0
+        self.postcheck_err = 0
+
+    def decode_input(self):
+        try:
+            # Check if input is a package
+            module_spec = importlib.util.find_spec(self.package_or_directory_name)
+            if not module_spec: # Not a package, passed a directory
+                self.directory = self.package_or_directory_name
+                assert os.path.exists(self.directory), "Directory {} does not exist.".format(self.directory)
+                return
+            
+            path = module_spec.submodule_search_locations
+            if path:
+                self.directory = path[0]
+                return
+    
+            path = module_spec.origin
+            if path:
+                self.directory = path
+                return
+        except:
+            self.directory = self.package_or_directory_name
+            assert os.path.exists(self.directory), "Directory {} does not exist.".format(self.directory)
+
 
     def do(self):
         self.set_roots()
@@ -48,12 +72,16 @@ class Tweak(object):
     def finalize(self):
         if self.ok:
             for root, file in self.tweak_files:
+                basename = self.trim_slash(root)
                 self.print_status('Finalizing - {}'.format(os.path.normpath(root + '/' + file)))
                 try:
-                    shutil.copy(os.path.join(self.output_dir, root, file), os.path.join(root, file))
+                    shutil.copy(os.path.join(self.output_dir, basename, file), os.path.join(root, file))
                 except shutil.SameFileError:
                     pass
-            self.print_status('Tweak Success!')
+            if self.precheck_err + self.postcheck_err == 0:
+                self.print_status('Tweak Success!')
+            else:
+                self.print_status('Tweak Success! [Conditional => {} compiler error(s) in source code when started.]'.format(self.precheck_err))
             print()
         else:
             self.print_status('Tweak Failed!')
@@ -66,9 +94,10 @@ class Tweak(object):
 
     def restore(self):
         for root, file in self.tweak_files:
+            basename = self.trim_slash(root)
             self.print_status('Restoring - {}'.format(os.path.normpath(root + '/' + file)))
             try:
-                shutil.copy(os.path.join(self.backup_dir, root, file), os.path.join(root, file))
+                shutil.copy(os.path.join(self.backup_dir, basename, file), os.path.join(root, file))
             except shutil.SameFileError:
                 pass
         self.print_status('Restore Success!\n')
@@ -87,19 +116,21 @@ class Tweak(object):
         cnt_success= 0
         cnt_fail = 0
         for root, file in self.tweak_files:
-            with open(os.path.join(self.output_dir, root, file), 'r') as f:
+            basename = self.trim_slash(root)
+            with open(os.path.join(self.output_dir, basename, file), 'r') as f:
                 try:
                     ast.parse(f.read())
                     cnt_success += 1
                 except:
                     cnt_fail += 1
                     print('Post-check:  => ' + root + '/' + file + ' => ' + str(sys.exc_info()))
+                self.postcheck_err = cnt_fail
                 self.print_status('Post-check: Success - {}, Failed - {}, Processed - {}%, Total - {}'.format(cnt_success,
                                                                                                       cnt_fail,
                                                                                                       100 * (cnt_success + cnt_fail)//len(self.tweak_files),
                                                                                                       len(self.tweak_files)
                                                                                                       ))
-        if cnt_fail == 0:
+        if cnt_fail == 0 or (self.precheck_err == self.postcheck_err):
             self.ok = True
         print()
 
@@ -107,13 +138,15 @@ class Tweak(object):
         cnt_success = 0
         cnt_fail = 0
         for root, file in self.tweak_files:
-            with open(os.path.join(self.backup_dir, root, file), 'r') as f:
+            basename = self.trim_slash(root)
+            with open(os.path.join(self.backup_dir, basename, file), 'r') as f:
                 try:
                     ast.parse(f.read())
                     cnt_success += 1
                 except:
                     cnt_fail += 1
                     print('Pre-check :  => ' + root + '/' + file + ' => ' + str(sys.exc_info()))
+                self.precheck_err = cnt_fail
                 self.print_status('Pre-check : Success - {}, Failed - {}, Processed - {}%, Total - {}'.format(cnt_success,
                                                                                                       cnt_fail,
                                                                                                       100 * (cnt_success + cnt_fail)//len(self.tweak_files),
@@ -128,14 +161,15 @@ class Tweak(object):
         cnt_success = 0
         for root,file in self.tweak_files:
             cnt_success += 1
+            basename = self.trim_slash(root)
             self.print_status('Tweaking file {}/{} - {}'.format(cnt_success, len(self.tweak_files), os.path.normpath(root + '/' + file)))
-            if not os.path.exists(os.path.join(self.output_dir, root)):
+            if not os.path.exists(os.path.join(self.output_dir, basename)):
                 try:
-                    pathlib.Path(os.path.join(self.output_dir, root)).mkdir(parents=True, exist_ok=True)
+                    pathlib.Path(os.path.join(self.output_dir, basename)).mkdir(parents=True, exist_ok=True)
                 except:
-                    os.makedirs(os.path.join(self.output_dir,root), exist_ok=True)
+                    os.makedirs(os.path.join(self.output_dir,basename), exist_ok=True)
 
-            with open(os.path.join(self.output_dir, root, file), 'w') as b:
+            with open(os.path.join(self.output_dir, basename, file), 'w') as b:
                 with open(os.path.join(root, file), 'r') as f:
                     found_def = False
                     found_colon = False
@@ -181,37 +215,44 @@ class Tweak(object):
 
                         b.write(line)
 
+    def trim_slash(self, path):
+        if path[:1] == '/' :
+            return path[1:]
+        else:
+            return path
+
     def backup(self):
         cnt=0
         for root,file in self.tweak_files:
             cnt += 1
+            basename = self.trim_slash(root)
             self.print_status('Creating backup {}/{} - {}'.format(cnt, len(self.tweak_files), os.path.normpath(root + '/' + file)))
             try:
-                if not os.path.exists(os.path.join(self.backup_dir,root)):
+                if not os.path.exists(os.path.join(self.backup_dir,basename)):
 
                     try:
-                        pathlib.Path(os.path.join(self.backup_dir,root)).mkdir(parents=True, exist_ok=True)
+                        pathlib.Path(os.path.join(self.backup_dir,basename)).mkdir(parents=True, exist_ok=True)
                     except:
-                        os.makedirs(os.path.join(self.backup_dir,root), exist_ok=True)
+                        os.makedirs(os.path.join(self.backup_dir,basename), exist_ok=True)
 
-                shutil.copy(os.path.join(root,file), os.path.join(self.backup_dir,root))
+                shutil.copy(os.path.join(root,file), os.path.join(self.backup_dir,basename))
             except shutil.SameFileError:
                 pass
 
     def traverse_files(self):
         for root, dirs, files in os.walk(self.resource_dir, topdown=True):
             for name in files:
-                if self.scan_file_name:
-                    if self.scan_file_name != name:
+                if self.file_name:
+                    if self.file_name != name:
                         continue
                 if name[-3:] != '.py':
                     continue
                 self.print_status('Selecting file - {}'.format(os.path.normpath(root + '/' + name)))
                 self.tweak_files.append((root, name))
-                if self.scan_file_name:
+                if self.file_name:
                     return
-            if not self.scan_subdir:
-                break
+            #if not self.scan_subdir:
+            #    break
 
     def set_roots(self):
         self.cwd = os.getcwd()
@@ -219,11 +260,7 @@ class Tweak(object):
         self.log_dir = os.path.join(self.cwd, self.log_dir_name)
         self.backup_dir = os.path.join(self.cwd, self.backup_dir_name)
         self.output_dir = os.path.join(self.cwd, self.output_dir_name)
-        if self.resource_type == 'package':
-            self.resource_dir_name = resource_filename(self.resource_manager, self.resource)
-        else:
-            self.resource_dir_name = self.resource
-        self.resource_dir = os.path.normpath(self.resource_dir_name)
+        self.resource_dir = os.path.normpath(self.directory)
 
     def create_dirs(self):
         if not os.path.exists(self.log_dir):
