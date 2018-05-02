@@ -31,9 +31,14 @@ cd -
 
 # Install Kibana
 cd $BASE_PATH
-wget https://artifacts.elastic.co/downloads/kibana/kibana-${ELK_VERSION}-linux-x86_64.tar.gz
-tar -zxf kibana-${ELK_VERSION}-linux-x86_64.tar.gz
-cd kibana-${ELK_VERSION}-linux-x86_64
+if [ `uname -v |grep -ic darwin` -gt 0 ]; then
+    distro=darwin
+else
+    distro=linux
+fi
+wget https://artifacts.elastic.co/downloads/kibana/kibana-${ELK_VERSION}-$distro-x86_64.tar.gz
+tar -zxf kibana-${ELK_VERSION}-$distro-x86_64.tar.gz
+cd kibana-${ELK_VERSION}-$distro-x86_64
 perl -pi -e 's/#server.port: 5601/server.port: 5601/g' config/kibana.yml
 perl -pi -e 's/#server.host: "0.0.0.0"/server.host: "0.0.0.0"/g' config/kibana.yml
 perl -pi -e 's/#server.host: "localhost"/server.host: "0.0.0.0"/g' config/kibana.yml
@@ -47,6 +52,7 @@ cd logstash-${ELK_VERSION}
 echo '
 input {
     kafka {
+        codec => json
     }
 }
 output {
@@ -55,6 +61,7 @@ output {
 }
 ' > config/logstash.conf
 nohup bin/logstash -f config/logstash.conf &
+echo "Started Logstash"
 
 # Install Kafka
 cd $BASE_PATH
@@ -63,5 +70,6 @@ tar -zxf kafka_2.11-${KAFKA_VERSION}.tgz
 cd kafka_2.11-${KAFKA_VERSION}
 nohup bin/zookeeper-server-start.sh config/zookeeper.properties &
 nohup bin/kafka-server-start.sh config/server.properties &
-sleep 30
-echo "Hello World!" | bin/kafka-console-producer.sh --broker-list localhost:9092 --topic logstash
+sleep 60
+
+echo "All done"
