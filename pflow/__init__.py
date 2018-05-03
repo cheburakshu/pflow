@@ -1,6 +1,7 @@
 # profiler/__init__.py
 
-__version__ = '1.0'
+__version__ = '1.1'
 
+from . import kafkaq
 from . import tweak
 from . import probe
