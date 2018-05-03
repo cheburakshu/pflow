@@ -183,6 +183,7 @@ class Tweak(object):
                     pattern_any = re.compile(r'(\s*)(.*\n)') # All lines expected to end with a new line. If not indent_start will be set to zero
                     pattern_import = re.compile(r'^import(.*)')
                     pattern_from_import = re.compile(r'^from(.*)import(.*)')
+                    pattern_ends_escape = re.compile(r'(^.*)(\\)(\s*$)')
                     import_found = False
                     import_written = False
                     for line in f:
@@ -193,8 +194,9 @@ class Tweak(object):
                         has_colon = pattern_colon.search(line)
                         has_import = pattern_import.search(line) # Expects an import before inserting its own.
                         has_from_import = pattern_from_import.search(line) # Expects an import before inserting its own.
+                        has_ends_escape = pattern_ends_escape.search(line)
 
-                        if (has_import or has_from_import):
+                        if (has_import or has_from_import) and not has_ends_escape:
                             import_found = True
 
                         if not import_written and not has_future and not has_comment and import_found:
