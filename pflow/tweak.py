@@ -176,28 +176,47 @@ class Tweak(object):
                     window = False
                     def_start = 0
                     import_written = False
+                    pattern_future = re.compile(r'(.*)__future__(.*)') # import __future__ or from __future__ should be the first line
+                    pattern_comment = re.compile(r'(\s*#)')
+                    pattern_def = re.compile(r'(^\s*)(def .*)|(^\s*)(async\s+def .*)')
+                    pattern_colon = re.compile(r'\)\s*:')
+                    pattern_any = re.compile(r'(\s*)(.*\n)') # All lines expected to end with a new line. If not indent_start will be set to zero
+                    pattern_import = re.compile(r'^import(.*)')
+                    pattern_from_import = re.compile(r'^from(.*)import(.*)')
+                    import_found = False
+                    import_written = False
                     for line in f:
-                        if not import_written:
-                            if import_line != line:
-                                b.write(import_line)
-                            import_written = True
-                        pattern_def = re.compile(r'(^\s*)(def .*)|(^\s*)(async\s+def .*)')
-                        pattern_comment = re.compile(r'(\s*#)')
-                        pattern_colon = re.compile(r'\)\s*:')
-                        pattern_any = re.compile(r'(\s*)(.*\n)') # All lines expected to end with a new line. If not indent_start will be set to zero
 
+                        has_future = pattern_future.search(line)
                         has_def = pattern_def.search(line)
                         has_comment = pattern_comment.search(line)
                         has_colon = pattern_colon.search(line)
+                        has_import = pattern_import.search(line) # Expects an import before inserting its own.
+                        has_from_import = pattern_from_import.search(line) # Expects an import before inserting its own.
+
+                        if (has_import or has_from_import):
+                            import_found = True
+
+                        if not import_written and not has_future and not has_comment and import_found:
+                            if import_line != line:
+                                b.write(import_line)
+                            import_written = True
+
                         if pattern_any.search(line):
                             indent_start = pattern_any.search(line).end(1)
                         else:
                             indent_start = 0
 
                         if window is True and indent_start > 0:
+                            if not import_written:
+                                new_import_line = ' ' * indent_start + import_line
+                                if new_import_line != line:
+                                    b.write(new_import_line)
+
                             new_line = ' ' * indent_start + profile_line
                             if new_line != line:
                                 b.write(new_line)
+
                             window = False
 
                         if has_def:
