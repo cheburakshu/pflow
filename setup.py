@@ -38,7 +38,7 @@ setup(
     packages=packages,
     package_dir={'pflow': 'pflow'},
     install_requires=[
-        'kafka-python',
+        'confluent_kafka',
     ],
     #extras_require={
     #    ':python_version == "2.7" or python_version == "3.3"': ['enum34>=1.1.6, <2'],

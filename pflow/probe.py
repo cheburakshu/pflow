@@ -1,8 +1,8 @@
 import sys
 import datetime
 import json
-from kafka import KafkaProducer
 from functools import lru_cache
+from confluent_kafka import Producer
 
 class CustomEncoder(json.JSONEncoder):
     def default(self, o):
@@ -21,20 +21,22 @@ def profile():
         data['receiver'] = frame.f_code.co_name
 
         try:
-            data['call_param'] = json.dumps(frame.f_locals, cls=CustomEncoder, sort_keys=True)
+            data['call_param'] = json.dumps(frame.f_locals) #, cls=CustomEncoder)
         except:
              data['call_param'] = str(sys.exc_info())
 
-        bdata = json.dumps(data, cls=CustomEncoder, sort_keys=True).encode('utf-8')
+        bdata = json.dumps(data).encode('utf-8')
         send(bdata)
     except:
         print(sys.exc_info())
 
 @lru_cache(maxsize=2048)
 def create_producer():
-    return KafkaProducer()
+    p = Producer({'bootstrap.servers': 'localhost'}) #return KafkaProducer()
+    return p
 
 def send(data):
     producer = create_producer() #KafkaProducer()
-    producer.send('logstash', data)
-    producer.flush()
+    producer.poll(0)
+    producer.produce('logstash', data)
+    #producer.flush()
