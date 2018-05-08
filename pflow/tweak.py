@@ -105,7 +105,7 @@ class Tweak(object):
 
 
     def print_status(self, data, persist=False):
-        print(' '*150 + '\r',end='')
+        print(' '*80 + '\r',end='')
         print(data, end='')
         if not persist:
             print('\r', end='')

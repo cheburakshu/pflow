@@ -2,7 +2,7 @@
 
 __version__ = '1.1'
 
-from . import kafkaq
+from . import kafka
 from . import tweak
 from . import probe
 from . import client

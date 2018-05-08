@@ -1,7 +1,9 @@
 import sys
 import datetime
 import json
-from .kafkaq import KafkaQ
+import os
+
+from .client import Client
 
 class CustomEncoder(json.JSONEncoder):
     def default(self, o):
@@ -11,16 +13,20 @@ class CustomEncoder(json.JSONEncoder):
 
 def profile():
     try:
-        data = dict()
-        frame = sys._getframe().f_back
-        now = datetime.datetime.utcnow().isoformat()
+        #host = os.environ.get('PFLOW_HOST')
+        #port = os.environ.get('PFLOW_PORT')
+        #auth = os.environ.get('PFLOW_AUTH')
+        client = Client('localhost', 50000, b'abracadabra')
+        with client.lock:
+            data = dict()
+            frame = sys._getframe().f_back
+            now = datetime.datetime.utcnow().isoformat()
+    
+            data['call_time'] = now
+            data['caller'] = frame.f_back.f_code.co_name
+            data['receiver'] = frame.f_code.co_name
+            data['local'] = frame.f_locals
 
-        data['call_time'] = now
-        data['caller'] = frame.f_back.f_code.co_name
-        data['receiver'] = frame.f_code.co_name
-        data['local'] = frame.f_locals
-
-        kafkaQ = KafkaQ()
-        kafkaQ.enqueue(data)
+            client.send(data)
     except:
         print(sys.exc_info())
