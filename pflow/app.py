@@ -1,4 +1,9 @@
-class App():
+from .server import Server
+
+class App(Server):
     def __init__(self, *args, **kwargs):
-        pass
+        super().__init__()
+
+    def running(self):
+        print('app running')
 
