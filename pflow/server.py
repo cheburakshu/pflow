@@ -2,12 +2,12 @@ from multiprocessing import Process, Queue, cpu_count, RLock
 from threading import Event, Thread
 #from .manager import Manager
 #from .kafka import Kafka
-from .serverstate import ServerState
 import logging
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-logger = logging.getLogger(__name__)
+from .serverstate import ServerState
+from .logger import Logger
 
 class Server(object):
     '''
@@ -32,6 +32,7 @@ class Server(object):
         self.current_state = self.target_state = self.state_machine.INITIAL_STATE
         self.lock = RLock()
         self.state_change = Event()
+        self.logger = Logger(__name__)
 
         #self.queue = Queue()
         #Manager.register('get_queue', callable=lambda: self.queue)
@@ -51,23 +52,26 @@ class Server(object):
 
     def responder(self, responder_state):
         while True:
-            if self.current_state == responder_state and self.current_state != self.target_state:
-                self.state_change.wait()
-                inputs = self.state_machine.get_state_transition(self.current_state, self.target_state)
-                print(responder_state, inputs)
-                for input in inputs:
-                    next_state = self.state_machine.get_next_state(self.current_state, input)
-                    try:
-                        self.__getattribute__(next_state.lower())()
+            self.state_change.wait()
+            with self.lock:
+                if self.current_state == responder_state and self.current_state != self.target_state:
+                    print('signal clear', self.current_state)
+                    self.state_change.clear()
+                else:
+                    continue
+            inputs = self.state_machine.get_state_transition(self.current_state, self.target_state)
+            print(responder_state, inputs)
+            for input in inputs:
+                next_state = self.state_machine.get_next_state(self.current_state, input)
+                try:
+                    self.__getattribute__(next_state.lower())()
+                    with self.lock:
                         self.current_state = next_state
-                        print(responder_state, next_state)
-                    except:
-                        logger.warning(next_state)
-                    if self.current_state == self.target_state:
-                        break
-                self.state_change.clear()
-            else:
-                self.state_change.wait()
+                    self.logger.info(responder_state)
+                except:
+                    self.logger.warning(next_state)
+                if self.current_state == self.target_state:
+                    break
 
     def shutdown(self):
         pass
@@ -94,17 +98,16 @@ class Server(object):
 
     def start(self, *args, **kwargs):
         with self.lock:
-            self.input = self.state_machine.START
             self.target_state = self.state_machine.RUNNING
+            self.state_change.set()
 
     def stop(self, *args, **kwargs):
         with self.lock:
-            self.input = self.state_machine.STOP
             self.target_state = self.state_machine.SHUTDOWN
+            self.state_change.set()
 
     def restart(self, *args, **kwargs):
         with self.lock:
-            self.input = self.state_machine.SUSPEND
             self.target_state = self.state_machine.RUNNING
 #    def start(self):
 #        self.workers = [Process(target=self.work, args=(self.queue,)) for _ in range(self.NUMBER_OF_PROCESSES)]

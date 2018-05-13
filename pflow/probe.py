@@ -11,7 +11,7 @@ class CustomEncoder(json.JSONEncoder):
             return {'__datetime__': o.isoformat()}
         return {'__{}__'.format(o.__class__.__name__): o.__dict__}
 
-def profile():
+def profile(sensor=None):
     try:
         #host = os.environ.get('PFLOW_HOST')
         #port = os.environ.get('PFLOW_PORT')
@@ -25,8 +25,17 @@ def profile():
             data['call_time'] = now
             data['caller'] = frame.f_back.f_code.co_name
             data['receiver'] = frame.f_code.co_name
-            data['local'] = frame.f_locals
+            #data['local'] = frame.f_locals
+            try:
+                data['call_params'] = json.dumps(frame.f_locals, cls=CustomEncoder)
+            except:
+                data['call_params'] = json.dumps(sys.exc_info())
 
-            client.send(data)
+            if sensor:
+                data['sensor'] = sensor
+                 
+            encoded_data = json.dumps(data).encode('utf-8')
+
+            client.send(encoded_data)
     except:
         print(sys.exc_info())
