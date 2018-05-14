@@ -30,10 +30,6 @@ class Kafka(object):
 
     def produce(self, data):
         with self.lock:
-            print(data)
-            self.producer.poll(0)
             self.producer.produce('logstash', data)
-            print('data sent')
-            print(self.producer.flush())
-            print('data flushed')
+            #print(self.producer.flush())
 

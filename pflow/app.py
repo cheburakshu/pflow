@@ -11,7 +11,7 @@ class App(Server):
         self.queue = Queue()
         Manager.register('get_queue', callable=lambda: self.queue)
         self.manager = Manager(address=('',50000), authkey=b'abracadabra')
-        self.NUMBER_OF_PROCESSES = cpu_count()
+        self.NUMBER_OF_PROCESSES = cpu_count() * 2
         self.manager_thread = threading.Thread(target=self.start_manager,args=())
 
     def starting(self):
