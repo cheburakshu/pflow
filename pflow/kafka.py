@@ -10,7 +10,12 @@ from .singleton import Singleton
 #Python3
 class Kafka(object):
     def __init__(self,*args,**kwargs):
-        self.producer = Producer({'bootstrap.servers': 'localhost'})
+        self.producer = Producer({
+            'bootstrap.servers': 'localhost',
+            'queue.buffering.max.messages': 1000000,
+            'queue.buffering.max.ms': 100,
+            'socket.keepalive.enable': True
+            })
         self.lock = threading.RLock()
         self.logger = logging.Logger(__name__)
 
@@ -29,7 +34,6 @@ class Kafka(object):
                 return json.dumps(sys.exc_info()).encode('utf-8')
 
     def produce(self, data):
-        with self.lock:
-            self.producer.produce('logstash', data)
-            #print(self.producer.flush())
+        self.producer.poll(0)
+        self.producer.produce('logstash', data)
 
