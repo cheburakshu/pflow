@@ -39,6 +39,7 @@ setup(
     package_dir={'pflow': 'pflow'},
     install_requires=[
         'confluent_kafka',
+        'uvloop',
     ],
     #extras_require={
     #    ':python_version == "2.7" or python_version == "3.3"': ['enum34>=1.1.6, <2'],
