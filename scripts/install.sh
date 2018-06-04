@@ -77,6 +77,7 @@ install_kafka(){
     tar -zxf kafka_2.11-${KAFKA_VERSION}.tgz
     cd kafka_2.11-${KAFKA_VERSION}
     nohup bin/zookeeper-server-start.sh config/zookeeper.properties &
+    sleep 60
     nohup bin/kafka-server-start.sh config/server.properties &
     sleep 60
 }
@@ -90,19 +91,11 @@ install(){
 
 restart(){
     for i in `ps -ef|grep -E 'elasticsearch|zookeeper|kafka-server|logstash|kibana'|grep -v grep |awk '{print $2}'`; do kill -9 $i; done
-    sleep 5
-
-    echo "Starting kafka"
-    nohup $BASE_PATH/kafka_2.11-${KAFKA_VERSION}/bin/zookeeper-server-start.sh config/zookeeper.properties &
-    nohup $BASE_PATH/kafka_2.11-${KAFKA_VERSION}/bin/kafka-server-start.sh config/server.properties &
-    sleep 30
 
     echo "Starting Elastic"
     nohup $BASE_PATH/elasticsearch-${ELK_VERSION}/bin/elasticsearch &
-    sleep 10
-    echo "Starting logstash"
-    nohup $BASE_PATH/logstash-${ELK_VERSION}/bin/logstash -f config/logstash.conf &
-    sleep 10
+    sleep 30
+
     if [ `uname -v |grep -ic darwin` -gt 0 ]; then
         distro=darwin
     else
@@ -110,7 +103,17 @@ restart(){
     fi
     echo "Starting kibana"
     nohup $BASE_PATH/kibana-${ELK_VERSION}-$distro-x86_64/bin/kibana &
+    sleep 30
+
+    echo "Starting logstash"
+    nohup $BASE_PATH/logstash-${ELK_VERSION}/bin/logstash -f config/logstash.conf &
     sleep 10
+
+    echo "Starting kafka"
+    nohup $BASE_PATH/kafka_2.11-${KAFKA_VERSION}/bin/zookeeper-server-start.sh config/zookeeper.properties &
+    sleep 10
+    nohup $BASE_PATH/kafka_2.11-${KAFKA_VERSION}/bin/kafka-server-start.sh config/server.properties &
+
     echo "All done"
 }
 

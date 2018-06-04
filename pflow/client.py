@@ -20,11 +20,12 @@ except:
 
 class Client(metaclass=Singleton):
 #class Client(object):
-    def __init__(self, host=None, port=None, authkey=None, kafka_available=False, n_workers=20, *args, **kwargs):
+    def __init__(self, host=None, port=None, authkey=None, kafka_available=False, min_records=1000, *args, **kwargs):
         self.has_data = threading.Event()
         self.logger = Logger(__name__)
         self.deque = deque()
-        self.workers = n_workers
+        self.outbox = deque()
+        self.min_records = min_records
         self.overflow_error = False
 
         if kafka_available:
@@ -48,8 +49,7 @@ class Client(metaclass=Singleton):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         tasks = []
-        for i in range(self.workers):
-            tasks.append(asyncio.ensure_future(self.get()))
+        tasks.append(asyncio.ensure_future(self.get()))
         self.loop.run_until_complete(asyncio.gather(*tasks))
 
     def create_event_loop(self):
@@ -81,6 +81,12 @@ class Client(metaclass=Singleton):
     def _wait(self):
         self.has_data.wait()
 
+    async def empty(self):
+        await self.loop.run_in_executor(self.executor, self._empty)
+
+    def _empty(self):
+        self.outbox.clear()
+
     async def put(self, data):
         try:
             try:
@@ -91,8 +97,14 @@ class Client(metaclass=Singleton):
             except:
                 data['call_params'] = None
 
-# The below line takes 4 minutes for a million calls
-            await self.loop.run_in_executor(self.executor, self.send, json.dumps(data).encode('utf-8'))
+            self.outbox.append(data)
+
+            if len(self.outbox) >= self.min_records: 
+# The below line takes 4 minutes for a million calls one by one, hence the outbox approach.
+                await self.loop.run_in_executor(self.executor, self.send, json.dumps(self.outbox).encode('utf-8'))
+                await self.empty()
+            else:
+                await asyncio.sleep(0)
         except OverflowError:
             self.logger.warn('OverflowError, not parsing call params anymore')
             self.overflow_error = True
