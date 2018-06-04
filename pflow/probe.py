@@ -2,6 +2,7 @@ import sys
 import datetime
 import json
 import asyncio
+import platform
 
 from collections import deque
 from functools import lru_cache
@@ -40,7 +41,9 @@ def profile(sensor=None):
             'receiver': sys._getframe().f_back.f_code.co_name,
             'call_params': sys._getframe().f_back.f_locals,
             'file': sys._getframe().f_back.f_globals.get('__file__'),
-            'sensor': sensor
+            'sensor': sensor,
+            'hostname': platform.node(),
+            'system': platform.system()
             })
     except:
         client.logger.error(sys.exc_info())
