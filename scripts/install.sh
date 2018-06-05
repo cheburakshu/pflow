@@ -16,7 +16,7 @@ fi
 
 # Install Elasticsearch
 
-BASE_PATH=$HOME
+BASE_PATH=${HOME}/viz
 ELK_VERSION=6.2.2
 KAFKA_VERSION=1.0.1
 
