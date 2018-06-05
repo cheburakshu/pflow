@@ -106,7 +106,7 @@ class Client(metaclass=Singleton):
             self.logger.error(str(sys.exc_info()))
 
     async def check_to_send(self):
-            if len(self.outbox) >= self.min_records: 
+            if (len(self.outbox) >= self.min_records) or (len(self.outbox) > 0 and self.has_data.is_set() is False): 
 # The below line takes 4 minutes for a million calls one by one, hence the outbox approach.
                 await self.loop.run_in_executor(self.executor, self.send, json.dumps(self.outbox).encode('utf-8'))
                 await self.empty()

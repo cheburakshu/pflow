@@ -14,11 +14,12 @@ if [ -z $JAVA_HOME ]; then
     fi 
 fi
 
-# Install Elasticsearch
 
-BASE_PATH=${HOME}/viz
+BASE_PATH=${HOME}/pflow-dev
 ELK_VERSION=6.2.2
 KAFKA_VERSION=1.0.1
+
+mkdir -p $BASE_PATH
 
 install_elastic(){
     cd $BASE_PATH
@@ -63,7 +64,6 @@ input {
 }
 output {
     elasticsearch { hosts => ["localhost:9200"] }
-    stdout { codec => rubydebug }
 }
 ' > config/logstash.conf
     nohup bin/logstash -f config/logstash.conf &
