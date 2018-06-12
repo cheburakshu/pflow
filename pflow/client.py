@@ -112,11 +112,6 @@ class Client(metaclass=Singleton):
                 await self.empty()
             else:
                 await asyncio.sleep(0)
-        except OverflowError:
-            self.logger.warn('OverflowError, not parsing call params anymore')
-            self.overflow_error = True
-        except:
-            self.logger.error(str(sys.exc_info()))
 
     def send(self, val):
         if self.kafka_available:

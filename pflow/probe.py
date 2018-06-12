@@ -19,7 +19,7 @@ client = None
 @lru_cache(maxsize=2048)
 def get_client():
 # Client is a singleton, instantiated on its first call/load
-    return Client('localhost', 50000, b'abracadabra', kafka_available=True)
+    return Client('localhost', 50000, b'abracadabra', kafka_available=False)
 
 def profile(sensor=None):
     global client

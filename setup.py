@@ -41,6 +41,7 @@ setup(
         'confluent_kafka',
         'uvloop',
         'ujson',
+        'sanic',
     ],
     #extras_require={
     #    ':python_version == "2.7" or python_version == "3.3"': ['enum34>=1.1.6, <2'],
