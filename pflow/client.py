@@ -117,4 +117,5 @@ class Client(metaclass=Singleton):
         if self.kafka_available:
             self.kafka.produce(val)
         else:
+            self.logger.info('Sending data to remote server')
             self.queue.put(val) # Queue is thread-safe and the operation is atomic. No sync primitives required

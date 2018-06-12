@@ -14,6 +14,7 @@ class Kafka(object):
             'bootstrap.servers': 'localhost',
             'queue.buffering.max.messages': 1000000,
             'queue.buffering.max.ms': 100,
+            'socket.timeout.ms': 12000, # 12 sec - recomendation from Heroku to try to avoid disconnection
             'socket.keepalive.enable': True
             })
         self.lock = threading.RLock()

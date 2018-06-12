@@ -42,9 +42,14 @@ class Server(object):
     def start_transition_manager(self, *args, **kwargs):
         loop = asyncio.get_event_loop()
         tasks = []
+        self.logger.info('Starting Transition Mananger')
         for state in self.state_machine.VALID_STATES:
             tasks.append(asyncio.ensure_future(self.marshall(state, loop)))
-        loop.run_until_complete(asyncio.gather(*tasks))
+        try:
+            loop.run_until_complete(asyncio.gather(*tasks))
+        except KeyboardInterrupt:
+            self.logger.warn('Received keyboardInterrupt. Shutting down loop.')
+            loop.stop()
 
     async def marshall(self, responder_state, loop):
         with ThreadPoolExecutor() as executor:
@@ -52,21 +57,23 @@ class Server(object):
 
     def responder(self, responder_state):
         while True:
+            self.logger.info('State responder for {} is waiting for signal..'.format(responder_state))
             self.state_change.wait()
             with self.lock:
                 if self.current_state == responder_state and self.current_state != self.target_state:
-                    print('signal clear', self.current_state)
+                    self.logger.info('State responder for {} is clearing signal..'.format(responder_state))
                     self.state_change.clear()
                 else:
                     continue
+            self.logger.info('Getting inputs for state transition from {0} to {1}'.format(self.current_state, self.target_state))
             inputs = self.state_machine.get_state_transition(self.current_state, self.target_state)
-            print(responder_state, inputs)
             for input in inputs:
                 next_state = self.state_machine.get_next_state(self.current_state, input)
                 try:
                     self.__getattribute__(next_state.lower())()
                     with self.lock:
                         self.current_state = next_state
+                        self.logger.info('Current state is {}'.format(next_state))
                     self.logger.info(responder_state)
                 except:
                     self.logger.warning(next_state)
@@ -77,38 +84,39 @@ class Server(object):
         pass
 
     def starting(self):
-        print('starting called')
         pass
 
     def standby(self):
-        print('standby called')
         pass
 
     def running(self):
-        print('running called')
         pass
 
     def suspending(self):
-        print('suspending called')
         pass
 
     def shutting_down(self):
-        print('shutting down called')
         pass
 
     def start(self, *args, **kwargs):
+        self.logger.info('Starting server...')
         with self.lock:
+            self.logger.info('Setting target state...')
             self.target_state = self.state_machine.RUNNING
             self.state_change.set()
+        self.logger.info('Calling State Transition Manager')
+        self.start_transition_manager()
 
     def stop(self, *args, **kwargs):
         with self.lock:
             self.target_state = self.state_machine.SHUTDOWN
             self.state_change.set()
+        self.start_transition_manager()
 
     def restart(self, *args, **kwargs):
         with self.lock:
             self.target_state = self.state_machine.RUNNING
+        self.start_transition_manager()
 #    def start(self):
 #        self.workers = [Process(target=self.work, args=(self.queue,)) for _ in range(self.NUMBER_OF_PROCESSES)]
 #        for w in self.workers:
